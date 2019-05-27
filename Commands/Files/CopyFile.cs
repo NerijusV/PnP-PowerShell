@@ -114,15 +114,28 @@ namespace SharePointPnP.PowerShell.Commands.Files
                 _sourceContext = ClientContext.Clone(sourceWebUri);
             }
 
-            File file = _sourceContext.Web.GetFileByServerRelativeUrl(SourceUrl);
-            Folder folder = _sourceContext.Web.GetFolderByServerRelativeUrl(SourceUrl);
-            file.EnsureProperties(f => f.Name, f => f.Exists);
-#if !SP2013
-            folder.EnsureProperties(f => f.Name, f => f.Exists);
-            bool srcIsFolder = folder.Exists;
-#else
-            folder.EnsureProperties(f => f.Name);
             bool srcIsFolder;
+            File file;
+            try
+            {
+                file = _sourceContext.Web.GetFileByServerRelativeUrl(SourceUrl);
+                file.EnsureProperties(f => f.Name, f => f.Exists);
+            }
+            catch
+            {
+                file = null;
+                srcIsFolder = true;
+            }
+
+            Folder folder;
+            try
+            {
+                folder = _sourceContext.Web.GetFolderByServerRelativeUrl(SourceUrl);
+#if !SP2013
+                folder.EnsureProperties(f => f.Name, f => f.Exists);
+                srcIsFolder = folder.Exists;
+#else
+            folder.EnsureProperties(f => f.Name);            
             try
             {
                 folder.EnsureProperties(f => f.ItemCount); //Using ItemCount as marker if this is a file or folder
@@ -134,6 +147,12 @@ namespace SharePointPnP.PowerShell.Commands.Files
             }
 
 #endif
+            }
+            catch
+            {
+                folder = null;
+                srcIsFolder = false;
+            }
 
             if (Force || ShouldContinue(string.Format(Resources.CopyFile0To1, SourceUrl, TargetUrl), Resources.Confirm))
             {
